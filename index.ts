@@ -17,6 +17,7 @@ import {
   QUOTE_MINT,
   MAX_POOL_SIZE,
   MIN_POOL_SIZE,
+  MAX_RISK_SCORE,
   QUOTE_AMOUNT,
   PRIVATE_KEY,
   USE_SNIPE_LIST,
@@ -52,6 +53,7 @@ import {
   CHECK_HOLDERS,
   CHECK_ABNORMAL_DISTRIBUTION,
   CHECK_TOKEN_DISTRIBUTION,
+  CHECK_IF_RUGGED,
   TELEGRAM_CHAT_ID,
   BLACKLIST_REFRESH_INTERVAL,
   MACD_SHORT_PERIOD,
@@ -151,8 +153,10 @@ function printDetails(wallet: Keypair, quoteToken: Token, bot: Bot) {
     logger.info(`Check burned: ${CHECK_IF_BURNED}`);
     logger.info(`Check mutable: ${CHECK_IF_MUTABLE}`);
     logger.info(`Check socials: ${CHECK_IF_SOCIALS}`);
+    logger.info(`Check rugged: ${botConfig.checkRugged}`);
     logger.info(`Min pool size: ${botConfig.minPoolSize.toFixed()}`);
     logger.info(`Max pool size: ${botConfig.maxPoolSize.toFixed()}`);
+    logger.info(`Max risk score: ${botConfig.maxRiskScore}`);
   }
 
   logger.info(`Check Holders: ${botConfig.checkHolders}`);    
@@ -225,6 +229,8 @@ const runListener = async () => {
     checkHolders:CHECK_HOLDERS,
     checkTokenDistribution:CHECK_TOKEN_DISTRIBUTION,
     checkAbnormalDistribution:CHECK_ABNORMAL_DISTRIBUTION,
+    checkRugged: CHECK_IF_RUGGED,
+    maxRiskScore: MAX_RISK_SCORE,
     telegramChatId:TELEGRAM_CHAT_ID,
     telegramBotToken: TELEGRAM_BOT_TOKEN,
     blacklistRefreshInterval: BLACKLIST_REFRESH_INTERVAL,

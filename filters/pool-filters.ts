@@ -13,10 +13,12 @@ import {
   CHECK_IF_SOCIALS, 
   CHECK_TOKEN_DISTRIBUTION,
   CHECK_HOLDERS,
+  CHECK_IF_RUGGED,
   logger } from '../helpers';
 import { HoldersCountFilter, TopHolderDistributionFilter } from './holders';
 import { BlacklistFilter } from './blacklist.filter';
 import { BlacklistCache } from '../cache';
+import { RugCheckFilter } from './rugcheck.filter';
 
 export interface Filter {
   execute(poolKeysV4: LiquidityPoolKeysV4): Promise<FilterResult>;
@@ -64,6 +66,10 @@ export class PoolFilters {
 
     // not optional
     this.filters.push(new BlacklistFilter(connection, blacklistCache));
+
+    if (CHECK_IF_RUGGED) {
+      this.filters.push(new RugCheckFilter());
+    }
 
     if (!args.minPoolSize.isZero() || !args.maxPoolSize.isZero()) {
       this.filters.push(new PoolSizeFilter(connection, args.quoteToken, args.minPoolSize, args.maxPoolSize));

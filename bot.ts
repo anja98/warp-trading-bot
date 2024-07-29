@@ -58,6 +58,8 @@ export interface BotConfig {
   checkHolders: boolean;
   checkTokenDistribution: boolean;
   checkAbnormalDistribution: boolean;
+  checkRugged: boolean;
+  maxRiskScore: Number;
   telegramChatId: number;
   telegramBotToken: string,
   blacklistRefreshInterval: number,

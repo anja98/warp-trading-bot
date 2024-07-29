@@ -72,12 +72,14 @@ export const CHECK_IF_SOCIALS = retrieveEnvVariable('CHECK_IF_SOCIALS', logger) 
 export const CHECK_IF_MINT_IS_RENOUNCED = retrieveEnvVariable('CHECK_IF_MINT_IS_RENOUNCED', logger) === 'true';
 export const CHECK_IF_FREEZABLE = retrieveEnvVariable('CHECK_IF_FREEZABLE', logger) === 'true';
 export const CHECK_IF_BURNED = retrieveEnvVariable('CHECK_IF_BURNED', logger) === 'true';
+export const CHECK_IF_RUGGED = retrieveEnvVariable('CHECK_IF_RUGGED', logger) === 'true';
 export const MIN_POOL_SIZE = retrieveEnvVariable('MIN_POOL_SIZE', logger);
 export const MAX_POOL_SIZE = retrieveEnvVariable('MAX_POOL_SIZE', logger);
 export const USE_SNIPE_LIST = retrieveEnvVariable('USE_SNIPE_LIST', logger) === 'true';
 export const SNIPE_LIST_REFRESH_INTERVAL = Number(retrieveEnvVariable('SNIPE_LIST_REFRESH_INTERVAL', logger));
 export const BLACKLIST_REFRESH_INTERVAL = Number(retrieveEnvVariable('BLACKLIST_REFRESH_INTERVAL', logger));
 export const WHITELIST_REFRESH_INTERVAL = Number(retrieveEnvVariable('WHITELIST_REFRESH_INTERVAL', logger));
+export const MAX_RISK_SCORE = Number(retrieveEnvVariable('MAX_RISK_SCORE', logger));
 
 //Holders filters
 export const CHECK_TOKEN_DISTRIBUTION = retrieveEnvVariable('CHECK_TOKEN_DISTRIBUTION', logger)=== 'true';
