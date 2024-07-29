@@ -121,6 +121,7 @@ dist
 
 # Stores VSCode versions used for testing VSCode extensions
 .vscode-test
+.vscode
 
 # PNPM
 pnpm-lock.yaml
@@ -137,3 +138,6 @@ pnpm-lock.yaml
 
 # Visual Studio Code 
 *.code-workspace
+
+# Compiled JS code
+*.js
