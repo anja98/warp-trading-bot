@@ -1,6 +1,7 @@
-import { Liquidity, LiquidityPoolKeysV4 } from '@raydium-io/raydium-sdk';
-import { COMMITMENT_LEVEL, RPC_ENDPOINT, logger } from '../helpers';
-import { Connection } from '@solana/web3.js';
+import { Liquidity, LiquidityPoolKeysV4, TokenAmount, Price, Currency } from '@raydium-io/raydium-sdk';
+import { COMMITMENT_LEVEL, RPC_ENDPOINT, logger, calculateTokenPrice } from '../helpers';
+import { Connection, PublicKey } from '@solana/web3.js';
+import { BN } from 'bn.js';
 
 export class TechnicalAnalysisCache_Entity {
   constructor(process, poolKeys, prices) {
@@ -82,7 +83,41 @@ export class TechnicalAnalysisCache {
     // nu afdrug
     this.data.set(mint, entity);
   }
-  
+  /*
+  private async getTokenAmount(token: PublicKey) {
+    let connection = new Connection(RPC_ENDPOINT, {
+      commitment: COMMITMENT_LEVEL
+    });
+
+    const tokenAmount = await connection.getTokenAccountBalance(token);
+    return new BN(tokenAmount.value.amount);
+  }
+
+  private async calculateTokenPrice(poolKeys: LiquidityPoolKeysV4) {
+    try {
+      const baseAmount = await this.getTokenAmount(poolKeys.baseVault);
+      const quoteAmount = await this.getTokenAmount(poolKeys.quoteVault);
+      
+      logger.trace(`base vault ${poolKeys.baseVault}`);
+      logger.trace(`quote vault ${poolKeys.quoteVault}`);
+      logger.trace(`base decimals ${poolKeys.baseDecimals}`);
+      logger.trace(`quote decimals ${poolKeys.quoteDecimals}`);
+      logger.trace(`base amount ${baseAmount}`);
+      logger.trace(`quote amount ${quoteAmount}`);
+      
+      const baseReserve = baseAmount.div(new BN(10).pow(new BN(poolKeys.baseDecimals)));
+      const quoteReserve = quoteAmount.div(new BN(10).pow(new BN(poolKeys.quoteDecimals)));
+      const price = new Price(new Currency(poolKeys.baseDecimals), baseAmount, 
+                              new Currency(poolKeys.quoteDecimals), quoteAmount)
+
+      return price
+
+    } catch (error) {
+        console.error(`Failed to calculate token ${poolKeys.baseMint.toBase58()} price: ${error}`);
+      throw error;
+    }
+  }  
+  */
   private startWatcher(connection: Connection, mint: string): NodeJS.Timeout {
     return setInterval(async () => {
       try {
@@ -99,14 +134,16 @@ export class TechnicalAnalysisCache {
           this.data.delete(mint);
           return;
         }
-
+        /*
         let poolInfo = await Liquidity.fetchInfo({
           connection: connection,
           poolKeys: cached.poolKeys
         });
-
+       
         let tokenPriceBN = Liquidity.getRate(poolInfo);
+        */
 
+        let tokenPriceBN = await calculateTokenPrice(connection, cached.poolKeys);
         if (cached.prices.length === 0 || parseFloat(tokenPriceBN.toFixed(16)) !== cached.prices[cached.prices.length - 1].value) {
           logger.info(`cache token price ${currentTime} ${tokenPriceBN.toFixed(16)} `)
           cached.prices.push({ value: parseFloat(tokenPriceBN.toFixed(16)), date: currentTime });

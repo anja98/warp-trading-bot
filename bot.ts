@@ -18,7 +18,7 @@ import { Liquidity, LiquidityPoolKeysV4, LiquidityStateV4, Percent, Token, Token
 import { MarketCache, PoolCache, SnipeListCache } from './cache';
 import { PoolFilters } from './filters';
 import { TransactionExecutor } from './transactions';
-import { createPoolKeys, KEEP_5_PERCENT_FOR_MOONSHOTS, logger, NETWORK, sleep } from './helpers';
+import { calculateTokenPrice, createPoolKeys, KEEP_5_PERCENT_FOR_MOONSHOTS, logger, NETWORK, sleep } from './helpers';
 import { Semaphore } from 'async-mutex';
 import { WarpTransactionExecutor } from './transactions/warp-transaction-executor';
 import { JitoTransactionExecutor } from './transactions/jito-rpc-transaction-executor';
@@ -222,6 +222,7 @@ export class Bot {
             `Send buy transaction attempt: ${i + 1}/${this.config.maxBuyRetries}`,
           );
           const tokenOut = new Token(TOKEN_PROGRAM_ID, poolKeys.baseMint, poolKeys.baseDecimals);
+          const tokenPrice = (await calculateTokenPrice(this.connection, poolKeys)).toFixed(10);
           const result = await this.swap(
             poolKeys,
             this.config.quoteAta,
@@ -238,13 +239,14 @@ export class Bot {
             logger.info(
               {
                 mint: poolState.baseMint.toString(),
+                buyPrice: tokenPrice,
                 signature: result.signature,
                 url: `https://solscan.io/tx/${result.signature}?cluster=${NETWORK}`,
               },
               `Confirmed buy tx`,
             );
 
-            await this.messaging.sendTelegramMessage(`💚Confirmed buy💚\n\nMint <code>${poolKeys.baseMint.toString()}</code>\nSignature <code>${result.signature}</code>`, poolState.baseMint.toString())
+            await this.messaging.sendTelegramMessage(`💚Confirmed buy💚\n\nBuy ${tokenPrice}\nMint <code>${poolKeys.baseMint.toString()}</code>\nSignature <code>${result.signature}</code>`, poolState.baseMint.toString())
 
             break;
           }

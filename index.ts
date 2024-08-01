@@ -271,10 +271,9 @@ const runListener = async () => {
   listeners.on('market', async (updatedAccountInfo: KeyedAccountInfo) => {
     const marketState = MARKET_STATE_LAYOUT_V3.decode(updatedAccountInfo.accountInfo.data);
 
-    //TODO: only interested in sniped tokens
     const isInCache = await bot.isInSnipListCache(marketState.baseMint);
     if ((botConfig.useSnipeList && isInCache) || (!botConfig.useSnipeList)) {
-      logger.info({marketState}, `saving market cache token ${marketState.baseMint}`);
+      logger.info(`saving market cache token ${marketState.baseMint}`);
       marketCache.save(updatedAccountInfo.accountId.toString(), marketState);
     }
   });
