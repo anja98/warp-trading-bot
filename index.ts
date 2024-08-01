@@ -1,4 +1,4 @@
-import { MarketCache, PoolCache } from './cache';
+import { MarketCache, PoolCache, SnipeListCache } from './cache';
 import { Listeners } from './listeners';
 import { Connection, KeyedAccountInfo, Keypair } from '@solana/web3.js';
 import { LIQUIDITY_STATE_LAYOUT_V4, MARKET_STATE_LAYOUT_V3, Token, TokenAmount } from '@raydium-io/raydium-sdk';
@@ -268,9 +268,15 @@ const runListener = async () => {
     cacheNewMarkets: CACHE_NEW_MARKETS,
   });
 
-  listeners.on('market', (updatedAccountInfo: KeyedAccountInfo) => {
+  listeners.on('market', async (updatedAccountInfo: KeyedAccountInfo) => {
     const marketState = MARKET_STATE_LAYOUT_V3.decode(updatedAccountInfo.accountInfo.data);
-    marketCache.save(updatedAccountInfo.accountId.toString(), marketState);
+
+    //TODO: only interested in sniped tokens
+    const isInCache = await bot.isInSnipListCache(marketState.baseMint);
+    if ((botConfig.useSnipeList && isInCache) || (!botConfig.useSnipeList)) {
+      logger.info({marketState}, `saving market cache token ${marketState.baseMint}`);
+      marketCache.save(updatedAccountInfo.accountId.toString(), marketState);
+    }
   });
 
   listeners.on('pool', async (updatedAccountInfo: KeyedAccountInfo) => {
@@ -281,16 +287,27 @@ const runListener = async () => {
     let currentTimestamp = Math.floor(new Date().getTime() / 1000);
     let lag = currentTimestamp - poolOpenTime;
 
-    if (!exists && poolOpenTime > runTimestamp) {
-      poolCache.save(updatedAccountInfo.accountId.toString(), poolState);
+    // TODO: add another condition if exist, check poolOpenTime within X mins. Token may be burnt after pool open. This should be more
+    // efficient than blocking the buy process to sacrificing buy opportunities for other tokens.
+    if (botConfig.useSnipeList) {
+
+    }
+
+    if ((!exists && poolOpenTime > runTimestamp) ||
+          (botConfig.useSnipeList)) {
+
+      // no useing snipe list. so normal flow is to trade new tokens.
+      if (!botConfig.useSnipeList) {
+        poolCache.save(updatedAccountInfo.accountId.toString(), poolState);
       
-      if(MAX_LAG != 0 && lag > MAX_LAG){
-        logger.trace(`Lag too high: ${lag} sec`);
-        return;
-      } else {
-        logger.trace(`Lag: ${lag} sec`);
-        await bot.buy(updatedAccountInfo.accountId, poolState, lag);
+        if(MAX_LAG != 0 && lag > MAX_LAG){
+          logger.error(`Lag too high: ${lag} sec`);
+          return;
+        } else {
+          logger.trace(`Lag: ${lag} sec`);
+        }
       }
+      await bot.buy(updatedAccountInfo.accountId, poolState, lag);
     }
   });
 

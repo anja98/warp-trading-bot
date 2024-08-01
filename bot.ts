@@ -145,13 +145,17 @@ export class Bot {
     return await this.whitelistCache.isInList(this.connection, poolKeys);
   }
 
+  public async isInSnipListCache(mint: PublicKey): Promise<boolean>{
+    return this.snipeListCache?.isInList(mint.toString());
+  }
+
   public async buy(accountId: PublicKey, poolState: LiquidityStateV4, lag: number = 0) {
     logger.trace({ mint: poolState.baseMint }, `Processing new pool...`);
 
     const whitelistSnipe = await this.whitelistSnipe(accountId, poolState);
 
     if (this.config.useSnipeList && !this.snipeListCache?.isInList(poolState.baseMint.toString())) {
-      logger.debug({ mint: poolState.baseMint.toString() }, `Skipping buy because token is not in a snipe list`);
+      logger.trace({ mint: poolState.baseMint.toString() }, `Skipping buy because token is not in a snipe list`);
       return;
     }
 
@@ -189,7 +193,7 @@ export class Bot {
           const match = await this.filterMatch(poolKeys);
 
           if (!match) {
-            logger.trace({ mint: poolKeys.baseMint.toString() }, `Skipping buy because pool doesn't match filters`);
+            logger.debug({ mint: poolKeys.baseMint.toString() }, `Skipping buy because pool doesn't match filters`);
             return;
           }
         }
@@ -199,7 +203,7 @@ export class Bot {
         if (!buySignal) {
           await this.messaging.sendTelegramMessage(`😭Skipping buy signal😭\n\nMint <code>${poolKeys.baseMint.toString()}</code>`, poolState.baseMint.toString())
 
-          logger.trace({ mint: poolKeys.baseMint.toString() }, `Skipping buy because buy signal not received`);
+          logger.info({ mint: poolKeys.baseMint.toString() }, `Skipping buy because buy signal not received`);
           return;
         }
       }
@@ -409,6 +413,12 @@ export class Bot {
     wallet: Keypair,
     direction: 'buy' | 'sell',
   ) {
+
+    const simulate = true;
+    if (simulate) {
+      return { confirmed: true, signature: 'SIMULATED' };
+    }
+
     const slippagePercent = new Percent(slippage, 100);
     const poolInfo = await Liquidity.fetchInfo({
       connection: this.connection,

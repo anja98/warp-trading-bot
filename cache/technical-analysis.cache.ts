@@ -108,6 +108,7 @@ export class TechnicalAnalysisCache {
         let tokenPriceBN = Liquidity.getRate(poolInfo);
 
         if (cached.prices.length === 0 || parseFloat(tokenPriceBN.toFixed(16)) !== cached.prices[cached.prices.length - 1].value) {
+          logger.info(`cache token price ${currentTime} ${tokenPriceBN.toFixed(16)} `)
           cached.prices.push({ value: parseFloat(tokenPriceBN.toFixed(16)), date: currentTime });
         }
 
