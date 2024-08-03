@@ -1,4 +1,5 @@
 import { BotConfig } from "./bot";
+import { logger } from "./helpers";
 
 export class TechnicalAnalysis {
     constructor(public botConfig: BotConfig) { }
@@ -90,6 +91,8 @@ export class TechnicalAnalysis {
         for (let i = 1; i < prices.length; i++) {
             delta.push(prices[i] - prices[i - 1]);
         }
+
+        //logger.debug({prices}, 'RSI delta');
 
         for (let i = 0; i < period; i++) {
             if (delta[i] > 0) {

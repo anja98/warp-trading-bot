@@ -3,6 +3,8 @@ import { COMMITMENT_LEVEL, RPC_ENDPOINT, logger, calculateTokenPrice } from '../
 import { Connection, PublicKey } from '@solana/web3.js';
 import { BN } from 'bn.js';
 
+const TIMEFRAME = 1 // in minutes
+
 export class TechnicalAnalysisCache_Entity {
   constructor(process, poolKeys, prices) {
     this.process = process;
@@ -66,6 +68,7 @@ export class TechnicalAnalysisCache {
     let cached = this.data.get(mint);
     cached.extendExpiryTime();
     this.set(mint, cached);
+    //logger.debug({cacheprices: cached.prices}, 'dumping price cache so far');
     return cached.prices.sort((a, b) => a.date.getTime() - b.date.getTime()).map(p => p.value);
   }
 
@@ -144,16 +147,21 @@ export class TechnicalAnalysisCache {
         */
 
         let tokenPriceBN = await calculateTokenPrice(connection, cached.poolKeys);
+        /* disable same price skipping. we should track all price movement in the timeframe 
         if (cached.prices.length === 0 || parseFloat(tokenPriceBN.toFixed(16)) !== cached.prices[cached.prices.length - 1].value) {
           logger.info(`cache token price ${currentTime} ${tokenPriceBN.toFixed(16)} `)
           cached.prices.push({ value: parseFloat(tokenPriceBN.toFixed(16)), date: currentTime });
         }
+        */
+
+        // track all price movement
+        cached.prices.push({ value: parseFloat(tokenPriceBN.toFixed(16)), date: currentTime });
 
         this.set(mint, cached);
       } catch (e) {
         logger.error({ error: e }, `Technical analysis watcher for mint: ${mint} failed`);
       }
-    }, 500);
+    }, TIMEFRAME * 60000);
   }
 
 }

@@ -18,7 +18,7 @@ import { Liquidity, LiquidityPoolKeysV4, LiquidityStateV4, Percent, Token, Token
 import { MarketCache, PoolCache, SnipeListCache } from './cache';
 import { PoolFilters } from './filters';
 import { TransactionExecutor } from './transactions';
-import { calculateTokenPrice, createPoolKeys, KEEP_5_PERCENT_FOR_MOONSHOTS, logger, NETWORK, sleep } from './helpers';
+import { calculateTokenPrice, createPoolKeys, KEEP_5_PERCENT_FOR_MOONSHOTS, logger, NETWORK, SIMULATE, sleep } from './helpers';
 import { Semaphore } from 'async-mutex';
 import { WarpTransactionExecutor } from './transactions/warp-transaction-executor';
 import { JitoTransactionExecutor } from './transactions/jito-rpc-transaction-executor';
@@ -27,6 +27,8 @@ import { TradeSignals } from './tradeSignals';
 import { Messaging } from './messaging';
 import { WhitelistCache } from './cache/whitelist.cache';
 import { TechnicalAnalysisCache } from './cache/technical-analysis.cache';
+import { SimulatedTradeCache } from './cache/simulatedtrade.cache';
+import { pollRequest } from 'telegraf/typings/button';
 
 export interface BotConfig {
   wallet: Keypair;
@@ -67,13 +69,15 @@ export interface BotConfig {
   MACDShortPeriod: number,
   MACDSignalPeriod: number,
   RSIPeriod: number,
+  RSIOverSoldThreshold: number,
   autoSellWithoutSellSignal: boolean,
   buySignalTimeToWait: number,
   buySignalPriceInterval: number,
   buySignalFractionPercentageTimeToWait: number,
   buySignalLowVolumeThreshold: number,
   useTechnicalAnalysis: boolean,
-  useTelegram: boolean
+  useTelegram: boolean,
+  simulate: boolean,
 }
 
 export class Bot {
@@ -87,6 +91,7 @@ export class Bot {
   public readonly isJito: boolean = false;
   private readonly tradeSignals: TradeSignals;
   private readonly messaging: Messaging;
+  private simTokenInProcess: string[] = [];
 
   constructor(
     private readonly connection: Connection,
@@ -94,6 +99,7 @@ export class Bot {
     private readonly poolStorage: PoolCache,
     private readonly txExecutor: TransactionExecutor,
     private readonly technicalAnalysisCache: TechnicalAnalysisCache,
+    private readonly simulatedTradeCache: SimulatedTradeCache,
     readonly config: BotConfig,
   ) {
     this.isWarp = txExecutor instanceof WarpTransactionExecutor;
@@ -150,7 +156,7 @@ export class Bot {
   }
 
   public async buy(accountId: PublicKey, poolState: LiquidityStateV4, lag: number = 0) {
-    logger.trace({ mint: poolState.baseMint }, `Processing new pool...`);
+    logger.trace({ mint: poolState.baseMint }, `Processing pool...`);
 
     const whitelistSnipe = await this.whitelistSnipe(accountId, poolState);
 
@@ -166,7 +172,7 @@ export class Bot {
       }
     }
 
-
+    // TODO: skip existing buy on same token
 
     const numberOfActionsBeingProcessed =
       this.config.maxTokensAtTheTime - this.semaphore.getValue() + this.sellExecutionCount;
@@ -222,7 +228,7 @@ export class Bot {
             `Send buy transaction attempt: ${i + 1}/${this.config.maxBuyRetries}`,
           );
           const tokenOut = new Token(TOKEN_PROGRAM_ID, poolKeys.baseMint, poolKeys.baseDecimals);
-          const tokenPrice = (await calculateTokenPrice(this.connection, poolKeys)).toFixed(10);
+          const tokenPrice = (await calculateTokenPrice(this.connection, poolKeys));
           const result = await this.swap(
             poolKeys,
             this.config.quoteAta,
@@ -239,19 +245,20 @@ export class Bot {
             logger.info(
               {
                 mint: poolState.baseMint.toString(),
-                buyPrice: tokenPrice,
+                buyPrice: tokenPrice.toFixed(10),
                 signature: result.signature,
                 url: `https://solscan.io/tx/${result.signature}?cluster=${NETWORK}`,
               },
               `Confirmed buy tx`,
             );
 
-            await this.messaging.sendTelegramMessage(`💚Confirmed buy💚\n\nBuy ${tokenPrice}\nMint <code>${poolKeys.baseMint.toString()}</code>\nSignature <code>${result.signature}</code>`, poolState.baseMint.toString())
+            if (SIMULATE) { this.simulatedTradeCache.recordBuy(poolKeys, tokenPrice, Number(this.config.quoteAmount.toFixed())); }
+            await this.messaging.sendTelegramMessage(`💚Confirmed buy💚\n\nBuy ${tokenPrice.toFixed()}\nMint <code>${poolKeys.baseMint.toString()}</code>\nSignature <code>${result.signature}</code>`, poolState.baseMint.toString())
 
             break;
           }
 
-          logger.info(
+          logger.error(
             {
               mint: poolState.baseMint.toString(),
               signature: result.signature,
@@ -260,7 +267,7 @@ export class Bot {
             `Error confirming buy tx`,
           );
         } catch (error) {
-          logger.debug({ mint: poolState.baseMint.toString(), error }, `Error confirming buy transaction`);
+          logger.error({ mint: poolState.baseMint.toString(), error }, `Error confirming buy transaction`);
         }
       }
     } catch (error) {
@@ -280,10 +287,10 @@ export class Bot {
         return;
       }
 
-      logger.trace({ mint: rawAccount.mint }, `Processing new token...`);
+      logger.trace({ mint: rawAccount.mint }, `Processing token sell...`);
 
       if (!poolData) {
-        logger.trace({ mint: rawAccount.mint.toString() }, `Token pool data is not found, can't sell`);
+        logger.error({ mint: rawAccount.mint.toString() }, `Token pool data is not found, can't sell`);
         return;
       }
 
@@ -325,6 +332,7 @@ export class Bot {
             `Send sell transaction attempt: ${i + 1}/${this.config.maxSellRetries}`,
           );
 
+          const tokenPrice = (await calculateTokenPrice(this.connection, poolKeys));
           const result = await this.swap(
             poolKeys,
             accountId,
@@ -339,39 +347,46 @@ export class Bot {
 
           if (result.confirmed) {
 
-            try {
-              this.connection.getParsedTransaction(result.signature, { commitment: "confirmed", maxSupportedTransactionVersion: 0 })
-                .then(async (parsedConfirmedTransaction) => {
-                  if (parsedConfirmedTransaction) {
-                    let preTokenBalances = parsedConfirmedTransaction.meta.preTokenBalances;
-                    let postTokenBalances = parsedConfirmedTransaction.meta.postTokenBalances;
-
-                    // Filter for WSOL mint and your public key
-                    let pre = preTokenBalances
-                      .filter(x => x.mint === this.config.quoteToken.mint.toString() && x.owner === this.config.wallet.publicKey.toString())
-                      .map(x => x.uiTokenAmount.uiAmount)
-                      .reduce((a, b) => a + b, 0); // Sum the pre values
-
-                    let post = postTokenBalances
-                      .filter(x => x.mint === this.config.quoteToken.mint.toString() && x.owner === this.config.wallet.publicKey.toString())
-                      .map(x => x.uiTokenAmount.uiAmount)
-                      .reduce((a, b) => a + b, 0); // Sum the post values
-
-                    let quoteAmountNumber = parseFloat(this.config.quoteAmount.toFixed());
-                    let profitOrLoss = (post - pre) - quoteAmountNumber;
-                    let percentageChange = (profitOrLoss / quoteAmountNumber) * 100
-
-                    await this.messaging.sendTelegramMessage(`⭕Confirmed sale at <b>${(post - pre).toFixed(5)}</b>⭕\n\n${profitOrLoss < 0 ? "🔴Loss " : "🟢Profit "}<code>${profitOrLoss.toFixed(5)} ${this.config.quoteToken.symbol} (${(percentageChange).toFixed(2)}%)</code>\n\nRetries <code>${i + 1}/${this.config.maxSellRetries}</code>`, rawAccount.mint.toString());
-                  }
-                })
-                .catch((error) => {
-                  console.log('Error fetching transaction details:', error);
-                });
-
-
-            } catch (error) {
-              console.log("Error calculating profit", error);
+            if (SIMULATE) {
+              this.simulatedTradeCache.recordSell(poolKeys.baseMint, tokenPrice);
+              const {tokenAmount, profitOrLoss, percentageChange} = this.simulatedTradeCache.getProfit(rawAccount.mint);
+              await this.messaging.sendTelegramMessage(`⭕Confirmed sale at <b>${tokenAmount.toFixed(5)}</b>⭕\n\nSell ${tokenPrice.toFixed()}\nMint <code>${rawAccount.mint}</code>\nSignature <code>${result.signature}</code>\n${profitOrLoss < 0 ? "🔴Loss " : "🟢Profit "}<code>${profitOrLoss.toFixed(5)} ${this.config.quoteToken.symbol} (${(percentageChange).toFixed(2)}%)</code>\n\nRetries <code>${i + 1}/${this.config.maxSellRetries}</code>`, rawAccount.mint.toString());
             }
+            else {
+              try {
+                this.connection.getParsedTransaction(result.signature, { commitment: "confirmed", maxSupportedTransactionVersion: 0 })
+                  .then(async (parsedConfirmedTransaction) => {
+                    if (parsedConfirmedTransaction) {
+                      let preTokenBalances = parsedConfirmedTransaction.meta.preTokenBalances;
+                      let postTokenBalances = parsedConfirmedTransaction.meta.postTokenBalances;
+
+                      // Filter for WSOL mint and your public key
+                      let pre = preTokenBalances
+                        .filter(x => x.mint === this.config.quoteToken.mint.toString() && x.owner === this.config.wallet.publicKey.toString())
+                        .map(x => x.uiTokenAmount.uiAmount)
+                        .reduce((a, b) => a + b, 0); // Sum the pre values
+
+                      let post = postTokenBalances
+                        .filter(x => x.mint === this.config.quoteToken.mint.toString() && x.owner === this.config.wallet.publicKey.toString())
+                        .map(x => x.uiTokenAmount.uiAmount)
+                        .reduce((a, b) => a + b, 0); // Sum the post values
+
+                      let quoteAmountNumber = parseFloat(this.config.quoteAmount.toFixed());
+                      let profitOrLoss = (post - pre) - quoteAmountNumber;
+                      let percentageChange = (profitOrLoss / quoteAmountNumber) * 100
+
+                      await this.messaging.sendTelegramMessage(`⭕Confirmed sale at <b>${(post - pre).toFixed(5)}</b>⭕\n\nSell ${tokenPrice.toFixed(10)}\n${profitOrLoss < 0 ? "🔴Loss " : "🟢Profit "}${profitOrLoss.toFixed(5)} ${this.config.quoteToken.symbol} (${(percentageChange).toFixed(2)}%)\n\nRetries ${i + 1}/${this.config.maxSellRetries}`, rawAccount.mint.toString());
+
+                    }
+                  })
+                  .catch((error) => {
+                    logger.error('Error fetching transaction details:', error);
+                  });
+              } catch (error) {
+                logger.error("Error calculating profit", error);
+              }
+            }
+
             logger.info(
               {
                 dex: `https://dexscreener.com/solana/${rawAccount.mint.toString()}?maker=${this.config.wallet.publicKey}`,
@@ -384,7 +399,7 @@ export class Bot {
             break;
           }
 
-          logger.info(
+          logger.error(
             {
               mint: rawAccount.mint.toString(),
               signature: result.signature,
@@ -393,7 +408,7 @@ export class Bot {
             `Error confirming sell tx`,
           );
         } catch (error) {
-          logger.debug({ mint: rawAccount.mint.toString(), error }, `Error confirming sell transaction`);
+          logger.error({ mint: rawAccount.mint.toString(), error }, `Error confirming sell transaction`);
         }
       }
     } catch (error) {
@@ -416,8 +431,7 @@ export class Bot {
     direction: 'buy' | 'sell',
   ) {
 
-    const simulate = true;
-    if (simulate) {
+    if (this.config.simulate) {
       return { confirmed: true, signature: 'SIMULATED' };
     }
 
@@ -516,7 +530,7 @@ export class Bot {
         }
 
         if (this.config.filterCheckInterval > 1) {
-          logger.trace({ mint: poolKeys.baseMint.toString() }, `${timesChecked + 1}/${timesToCheck} Filter didn't match, waiting for ${this.config.filterCheckInterval / 1000} sec.`);
+          logger.debug({ mint: poolKeys.baseMint.toString() }, `${timesChecked + 1}/${timesToCheck} Filter didn't match, waiting for ${this.config.filterCheckInterval / 1000} sec.`);
         }
         await sleep(this.config.filterCheckInterval);
       } finally {

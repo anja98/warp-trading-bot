@@ -89,7 +89,7 @@ export class PoolFilters {
     }
 
     for (const filterResult of result.filter((r) => !r.ok)) {
-      logger.trace(filterResult.message);
+      logger.debug(filterResult.message);
     }
 
     return false;

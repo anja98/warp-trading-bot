@@ -73,8 +73,8 @@ export class TradeSignals {
                         return false;
                     }
 
-                    if (currentRSI > 0 && currentRSI < 30 && macd.macd && macd.signal && macd.macd > macd.signal) {
-                        logger.info("RSI is less than 30, macd + signal = long, sending buy signal");
+                    if (currentRSI > 0 && currentRSI < this.config.RSIOverSoldThreshold && macd.macd && macd.signal && macd.macd > macd.signal) {
+                        logger.info(`RSI is less than ${this.config.RSIOverSoldThreshold}, macd + signal = long, sending buy signal`);
                         return true;
                     }
                 }
@@ -89,7 +89,7 @@ export class TradeSignals {
                     let isEmaSAbovePrevEmaS = EMA_3 > prevEMA_3;
 
                     if (previousRSI !== RSI) {
-                        logger.trace({
+                        logger.debug({
                             mint: poolKeys.baseMint.toString()
                         }, `(${timesChecked}) Waiting for buy signal: RSI: ${RSI.toFixed(3)}, RSI_EMA_11: ${RSI_EMA_11.toFixed(3)}, RSI_EMA_11 > RSI_EMA_11[-1]: ${RSI_prevEMA_11 < RSI_EMA_11}, macd>signal: ${isMacdAboveSignal}, price<ema_18: ${isEmaLAboveTokenPrice}, ema_3>ema_3[-1]: ${isEmaSAbovePrevEmaS}`);
                         previousRSI = RSI;
@@ -172,7 +172,7 @@ export class TradeSignals {
                     const trailingStopLoss = amountOut.subtract(trailingLossAmount);
 
                     if (trailingStopLoss.gt(stopLoss)) {
-                        logger.trace(
+                        logger.debug(
                             { mint: poolKeys.baseMint.toString() },
                             `Updating trailing stop loss from ${stopLoss.toFixed()} to ${trailingStopLoss.toFixed()}`,
                         );
@@ -218,7 +218,7 @@ export class TradeSignals {
 
                 await sleep(this.config.priceCheckInterval);
             } catch (e) {
-                logger.trace({ mint: poolKeys.baseMint.toString(), e }, `Failed to check token price`);
+                logger.error({ mint: poolKeys.baseMint.toString(), e }, `Failed to check token price`);
             } finally {
                 timesChecked++;
             }

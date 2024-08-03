@@ -35,6 +35,7 @@ export const CUSTOM_FEE = retrieveEnvVariable('CUSTOM_FEE', logger);
 export const MAX_LAG = Number(retrieveEnvVariable('MAX_LAG', logger));
 export const USE_TA = retrieveEnvVariable('USE_TA', logger) === 'true';
 export const USE_TELEGRAM = retrieveEnvVariable('USE_TELEGRAM', logger) === 'true';
+export const SIMULATE = retrieveEnvVariable('SIMULATE', logger) === 'true';
 
 // Buy
 export const AUTO_BUY_DELAY = Number(retrieveEnvVariable('AUTO_BUY_DELAY', logger));
@@ -101,3 +102,4 @@ export const MACD_LONG_PERIOD = Number (retrieveEnvVariable('MACD_LONG_PERIOD', 
 export const MACD_SIGNAL_PERIOD = Number (retrieveEnvVariable('MACD_SIGNAL_PERIOD', logger));
 
 export const RSI_PERIOD = Number (retrieveEnvVariable('RSI_PERIOD', logger));
+export const RSI_OVERSOLD_THRESHOLD = Number (retrieveEnvVariable('RSI_OVERSOLD_THRESHOLD', logger));
