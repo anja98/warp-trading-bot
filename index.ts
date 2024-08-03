@@ -69,7 +69,8 @@ import {
   BUY_SIGNAL_LOW_VOLUME_THRESHOLD,
   USE_TELEGRAM,
   USE_TA,
-  SIMULATE
+  SIMULATE,
+  BUY_NEW_TOKEN_ONLY
 } from './helpers';
 import { WarpTransactionExecutor } from './transactions/warp-transaction-executor';
 import { JitoTransactionExecutor } from './transactions/jito-rpc-transaction-executor';
@@ -77,6 +78,7 @@ import { TechnicalAnalysisCache } from './cache/technical-analysis.cache';
 import { SimulatedTradeCache } from './cache/simulatedtrade.cache';
 
 const pendingSell: string[] = [];
+const pendingBuy: string[] = [];
 
 const connection = new Connection(RPC_ENDPOINT, {
   wsEndpoint: RPC_WEBSOCKET_ENDPOINT,
@@ -129,6 +131,7 @@ function printDetails(wallet: Keypair, quoteToken: Token, bot: Bot) {
   logger.info(`Buy amount (${quoteToken.symbol}): ${botConfig.quoteAmount.toFixed()}`);
   logger.info(`Buy slippage: ${botConfig.buySlippage}%`);
 
+
   logger.info('- Sell -');
   logger.info(`Auto sell: ${AUTO_SELL}`);
   logger.info(`Auto sell delay: ${botConfig.autoSellDelay} ms`);
@@ -172,7 +175,8 @@ function printDetails(wallet: Keypair, quoteToken: Token, bot: Bot) {
   logger.info(`Buy signal MACD: ${MACD_SHORT_PERIOD}/${MACD_LONG_PERIOD}/${MACD_SIGNAL_PERIOD}`);
   logger.info(`Buy signal RSI: ${RSI_PERIOD}`);
   logger.info(`Buy signal RSI Oversold Threshold: ${RSI_OVERSOLD_THRESHOLD}`);
-  
+
+  logger.info(`Buy new tokens only: ${BUY_NEW_TOKEN_ONLY}`);
   
   logger.info('------- CONFIGURATION END -------');
 
@@ -180,16 +184,16 @@ function printDetails(wallet: Keypair, quoteToken: Token, bot: Bot) {
 }
 
 // Function to calculate the time difference
-function calculateTimeDifference(pastTime: Date): {hours, mins, secs} {
+function calculateTimeDifference(pastTime: Date): {days, hours, mins, secs} {
   const currentTime = new Date();
   const timeDifference = currentTime.getTime() - pastTime.getTime();
-
-  const hours = Math.floor(timeDifference / (1000 * 60 * 60));
+  const days = Math.floor(timeDifference / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((timeDifference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
   const mins = Math.floor((timeDifference % (1000 * 60 * 60)) / (1000 * 60));
   const secs = Math.floor((timeDifference % (1000 * 60)) / 1000);
 
   return {
-    hours, mins, secs
+    days, hours, mins, secs
   }
 }
 
@@ -268,7 +272,8 @@ const runListener = async () => {
     buySignalLowVolumeThreshold: BUY_SIGNAL_LOW_VOLUME_THRESHOLD,
     useTelegram: USE_TELEGRAM,
     useTechnicalAnalysis: USE_TA,
-    simulate: SIMULATE
+    simulate: SIMULATE,
+    buyNewTokenOnly: BUY_NEW_TOKEN_ONLY
   };
 
   const bot = new Bot(connection, marketCache, poolCache, txExecutor, technicalAnalysisCache, simulatedTradeCache, botConfig);
@@ -310,19 +315,21 @@ const runListener = async () => {
     let currentTimestamp = Math.floor(new Date().getTime() / 1000);
     let lag = currentTimestamp - poolOpenTime;
 
+    const {days, hours, mins, secs } = calculateTimeDifference(new Date(poolOpenTime * 1000));
+    let ago = "";
+    if (days > 0) { ago = ago + days + " days "};
+    if (hours > 0) { ago = ago + hours + " hours "};
+    if (mins > 0) {ago = ago + mins + " mins "};
+    ago = ago + secs + " secs";
+
     // TODO: add another condition if exist, check poolOpenTime within X mins. Token may be burnt after pool open. This should be more
     // efficient than blocking the buy process to sacrificing buy opportunities for other tokens.
 
     if ((!exists && 
-            ((poolOpenTime > runTimestamp) || botConfig.useSnipeList))) {
+            ((poolOpenTime > runTimestamp) || botConfig.useSnipeList || !BUY_NEW_TOKEN_ONLY))) {
 
-      const {hours, mins, secs } = calculateTimeDifference(new Date(poolOpenTime * 1000));
-      let ago = "";
-      if (hours > 0) { ago = ago + hours + " hours "};
-      if (mins > 0) {ago = ago + mins + " mins "};
-      ago = ago + secs + " secs";
-      logger.debug(`${poolState.baseMint} Pool Open ${poolOpenTime} (${ago} ago)`);
       poolCache.save(updatedAccountInfo.accountId.toString(), poolState);
+      logger.trace(`${poolState.baseMint} Pool Open ${poolOpenTime} (${ago} ago)`);
 
       // no using snipe list. so normal flow is to trade new tokens.
       if (!botConfig.useSnipeList) {
@@ -333,15 +340,30 @@ const runListener = async () => {
           logger.debug(`Lag: ${lag} sec`);
         }
       }
+
       await bot.buy(updatedAccountInfo.accountId, poolState, lag);
-
+      
       if (botConfig.simulate && 
-            simulatedTradeCache.has(poolState.baseMint)) {
-
+            simulatedTradeCache.has(poolState.baseMint) && 
+            !pendingSell.includes(poolState.baseMint.toBase58())) {
+        
+        pendingSell.push(poolState.baseMint.toBase58());
         await bot.sell(updatedAccountInfo.accountId, simulatedTradeCache.getSimulateAccount(poolState.baseMint));
 
         simulatedTradeCache.removeTrade(poolState.baseMint);
+
+        const index = pendingSell.indexOf(poolState.baseMint.toBase58());
+        if (index !== -1) {
+            pendingSell.splice(index, 1);
+        }
       }
+
+      if (!BUY_NEW_TOKEN_ONLY) {
+        //remove from poolCache
+        logger.trace(`Buy done. Remove poolCache to look for new buys for ${poolState.baseMint}`);
+        poolCache.delete(poolState.baseMint.toBase58());
+      }
+
     }
   });
 

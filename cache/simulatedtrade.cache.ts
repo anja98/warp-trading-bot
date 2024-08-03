@@ -29,11 +29,11 @@ export class SimulatedTradeCache {
       lpDecimals: poolKeys.lpDecimals, 
       quoteDecimals: poolKeys.quoteDecimals, 
       baseDecimals: poolKeys.baseDecimals,
-      buyPrice: buy.toFixed(poolKeys.baseDecimals)
+      buyPrice: buy.toFixed(16)
     });
-    let amount = quoteAmount / parseFloat(buy.toFixed(poolKeys.baseDecimals)); 
+    let amount = quoteAmount / parseFloat(buy.toFixed(16)); 
     amount = Number(amount.toFixed(poolKeys.baseDecimals));
-    logger.debug(`log buy transaction ${mint} buy ${buy.toFixed(poolKeys.baseDecimals)} amount ${amount} token / ${quoteAmount} SOL`);
+    logger.debug(`log buy transaction ${mint} buy ${buy.toFixed(16)} amount ${amount} token / ${quoteAmount} SOL`);
     if (this.keys.has(mint.toBase58())) {
       const order = this.keys.get(mint.toBase58());
       order.quoteAmount = quoteAmount;
@@ -55,7 +55,7 @@ export class SimulatedTradeCache {
   }
 
   public recordSell(mint: PublicKey, sell: Price) {
-    logger.debug(`log sell transaction ${mint} buy ${sell.toFixed(10)}`);
+    logger.debug(`log sell transaction ${mint} buy ${sell.toFixed(16)}`);
     if (this.keys.has(mint.toBase58())) {
       const order = this.keys.get(mint.toBase58());
       order.sell = sell;

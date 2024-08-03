@@ -78,6 +78,7 @@ export interface BotConfig {
   useTechnicalAnalysis: boolean,
   useTelegram: boolean,
   simulate: boolean,
+  buyNewTokenOnly: boolean
 }
 
 export class Bot {
@@ -253,7 +254,7 @@ export class Bot {
             );
 
             if (SIMULATE) { this.simulatedTradeCache.recordBuy(poolKeys, tokenPrice, Number(this.config.quoteAmount.toFixed())); }
-            await this.messaging.sendTelegramMessage(`💚Confirmed buy💚\n\nBuy ${tokenPrice.toFixed()}\nMint <code>${poolKeys.baseMint.toString()}</code>\nSignature <code>${result.signature}</code>`, poolState.baseMint.toString())
+            await this.messaging.sendTelegramMessage(`💚Confirmed buy💚\n\nBuy ${tokenPrice.toFixed(16)}\nMint <code>${poolKeys.baseMint.toString()}</code>\nSignature <code>${result.signature}</code>`, poolState.baseMint.toString())
 
             break;
           }

@@ -36,6 +36,7 @@ export const MAX_LAG = Number(retrieveEnvVariable('MAX_LAG', logger));
 export const USE_TA = retrieveEnvVariable('USE_TA', logger) === 'true';
 export const USE_TELEGRAM = retrieveEnvVariable('USE_TELEGRAM', logger) === 'true';
 export const SIMULATE = retrieveEnvVariable('SIMULATE', logger) === 'true';
+export const BUY_NEW_TOKEN_ONLY = retrieveEnvVariable('BUY_NEW_TOKEN_ONLY', logger) === 'true';
 
 // Buy
 export const AUTO_BUY_DELAY = Number(retrieveEnvVariable('AUTO_BUY_DELAY', logger));

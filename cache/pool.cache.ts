@@ -26,4 +26,8 @@ export class PoolCache {
       this.keys.set(mint, pool);
     }
   }
+
+  public async delete(mint: string) {
+    this.keys.delete(mint);
+  }
 }
