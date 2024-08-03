@@ -1,9 +1,9 @@
 import { Liquidity, LiquidityPoolKeysV4, TokenAmount, Price, Currency } from '@raydium-io/raydium-sdk';
-import { COMMITMENT_LEVEL, RPC_ENDPOINT, logger, calculateTokenPrice } from '../helpers';
+import { COMMITMENT_LEVEL, RPC_ENDPOINT, logger, calculateTokenPrice, BUY_SIGNAL_PRICE_INTERVAL } from '../helpers';
 import { Connection, PublicKey } from '@solana/web3.js';
 import { BN } from 'bn.js';
 
-const TIMEFRAME = 1 // in minutes
+const TIMEFRAME = BUY_SIGNAL_PRICE_INTERVAL / 1000 // in seconds
 
 export class TechnicalAnalysisCache_Entity {
   constructor(process, poolKeys, prices) {
@@ -161,7 +161,7 @@ export class TechnicalAnalysisCache {
       } catch (e) {
         logger.error({ error: e }, `Technical analysis watcher for mint: ${mint} failed`);
       }
-    }, TIMEFRAME * 60000);
+    }, TIMEFRAME * 1000);
   }
 
 }

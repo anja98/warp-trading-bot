@@ -90,11 +90,6 @@ export class TradeSignals {
                         previousRSI = RSI;
                     }
 
-                    if (((Date.now() - startTime) > maxSignalWaitTime) && prices.length < this.config.buySignalLowVolumeThreshold) {
-                        logger.error(`Not enough volume for signal after ${maxSignalWaitTime / 1000} seconds, skipping buy signal`);
-                        return false;
-                    }
-
                     if (((Date.now() - startTime) > maxSignalWaitTime) && RSI == 0 && !macd.macd) {
                         logger.error(`Not enough data for signal after ${maxSignalWaitTime / 1000} seconds, skipping buy signal`);
                         return false;

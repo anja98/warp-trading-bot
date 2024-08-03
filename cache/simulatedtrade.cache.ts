@@ -89,7 +89,7 @@ export class SimulatedTradeCache {
     const order = this.get(mint);
 
     let profitOrLoss = (parseFloat(order.sell.toFixed()) - parseFloat(order.buy.toFixed())) * order.baseAmount;
-    let percentageChange = (profitOrLoss / order.baseAmount) * 100
+    let percentageChange = (profitOrLoss / parseFloat(order.buy.toFixed())) * 100
     return { tokenAmount: order.baseAmount, profitOrLoss, percentageChange };
   }
 
