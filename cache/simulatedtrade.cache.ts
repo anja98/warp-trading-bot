@@ -55,7 +55,7 @@ export class SimulatedTradeCache {
   }
 
   public recordSell(mint: PublicKey, sell: Price) {
-    logger.debug(`log sell transaction ${mint} buy ${sell.toFixed(16)}`);
+    logger.debug(`log sell transaction ${mint} sell ${sell.toFixed(16)}`);
     if (this.keys.has(mint.toBase58())) {
       const order = this.keys.get(mint.toBase58());
       order.sell = sell;
@@ -89,7 +89,7 @@ export class SimulatedTradeCache {
     const order = this.get(mint);
 
     let profitOrLoss = (parseFloat(order.sell.toFixed()) - parseFloat(order.buy.toFixed())) * order.baseAmount;
-    let percentageChange = (profitOrLoss / parseFloat(order.baseAmount.toFixed())) * 100
+    let percentageChange = (profitOrLoss / order.quoteAmount) * 100
     return { tokenAmount: order.baseAmount, profitOrLoss, percentageChange };
   }
 

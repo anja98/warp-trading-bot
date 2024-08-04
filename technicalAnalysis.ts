@@ -38,13 +38,13 @@ export class TechnicalAnalysis {
         _shortPeriod : number = null, 
         _longPeriod: number = null, 
         _signalPeriod: number = null
-    ): { macd: number, signal: number } => {
+    ): { macd: number, signal: number, histogram: number } => {
         const shortPeriod = _shortPeriod ?? this.botConfig.MACDShortPeriod;
         const longPeriod = _longPeriod ?? this.botConfig.MACDLongPeriod;
         const signalPeriod = _signalPeriod ?? this.botConfig.MACDSignalPeriod;
 
         if (prices.length < longPeriod + signalPeriod - 1) {
-            return { macd: null, signal: null };
+            return { macd: null, signal: null, histogram: null};
         }
 
         const shortMultiplier = 2 / (shortPeriod + 1);
@@ -68,16 +68,19 @@ export class TechnicalAnalysis {
         }
         let signalEMA = sum / signalPeriod;
         const signal: number[] = [signalEMA]; 
+        const histogram: number[] = [];
 
         const signalMultiplier = 2 / (signalPeriod + 1);
         for (let i = signalPeriod; i < macdLine.length; i++) {
             signalEMA = (macdLine[i] - signalEMA) * signalMultiplier + signalEMA;
             signal.push(signalEMA);
+            histogram.push(Math.abs(macdLine[i]) - Math.abs(signalEMA));
         }
 
         return {
             macd: macdLine[macdLine.length - 1],
-            signal: signal[signal.length - 1]
+            signal: signal[signal.length - 1],
+            histogram: histogram[histogram.length - 1]
         };
     }
 

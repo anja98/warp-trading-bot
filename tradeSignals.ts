@@ -1,5 +1,5 @@
 import { Liquidity, LiquidityPoolKeysV4, Percent, TokenAmount } from "@raydium-io/raydium-sdk";
-import { logger, sleep } from "./helpers";
+import { logger, sleep, calculateTokenPrice } from "./helpers";
 import { Connection } from "@solana/web3.js";
 import { BotConfig } from "./bot";
 import { TechnicalAnalysis } from "./technicalAnalysis";
@@ -59,7 +59,7 @@ export class TradeSignals {
                     if (previousRSI !== currentRSI) {
                         logger.debug({ 
                             mint: poolKeys.baseMint.toString()
-                        }, `(${timesChecked}) Waiting for buy signal: RSI: ${currentRSI.toFixed(3)}, MACD: ${macd.macd}, Signal: ${macd.signal}`);
+                        }, `(${timesChecked}) Waiting for buy signal: RSI: ${currentRSI.toFixed(3)}, MACD: ${macd.macd}, Signal: ${macd.signal}, Histogram: ${macd.histogram}`);
                         previousRSI = currentRSI;
                     }
 
@@ -155,6 +155,12 @@ export class TradeSignals {
                     currencyOut: this.config.quoteToken,
                     slippage,
                 }).amountOut as TokenAmount;
+
+                /** Testing logic to calculate realtime price */
+                const tokenPrice = (await calculateTokenPrice(this.connection, poolKeys));
+                let liquidityPrice = parseFloat(amountOut.toFixed()) / parseFloat(amountIn.toFixed());
+                logger.debug({ mint: poolKeys.baseMint.toString() },
+                            `Token price: ${tokenPrice.toFixed()}, Liquidity.fetchInfo: ${liquidityPrice.toFixed()}`);
 
                 if (this.config.trailingStopLoss) {
                     const trailingLossFraction = amountOut.mul(this.config.stopLoss).numerator.div(new BN(100));
