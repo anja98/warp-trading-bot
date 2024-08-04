@@ -216,7 +216,7 @@ export class TradeSignals {
 
 
         if (this.config.autoSellWithoutSellSignal) {
-            logger.info({ mint: poolKeys.baseMint.toString(), e }, `Proceed to auto sell as no sell signal received for ${this.config.priceCheckDuration / 1000} secs.`);
+            logger.info({ mint: poolKeys.baseMint.toString() }, `Proceed to auto sell as no sell signal received for ${this.config.priceCheckDuration / 1000} secs.`);
             return true;
         } else {
             await this.messaging.sendTelegramMessage(`🚫NO SELL🚫\n\nMint <code>${poolKeys.baseMint.toString()}</code>\nTime ran out, sell stopped, you're a bagholder now`, poolKeys.baseMint.toString())
