@@ -157,11 +157,12 @@ export class TradeSignals {
                 }).amountOut as TokenAmount;
 
                 /** Testing logic to calculate realtime price */
+                /*
                 const tokenPrice = (await calculateTokenPrice(this.connection, poolKeys));
                 let liquidityPrice = parseFloat(amountOut.toFixed()) / parseFloat(amountIn.toFixed());
                 logger.debug({ mint: poolKeys.baseMint.toString() },
                             `Token price: ${tokenPrice.toFixed()}, Liquidity.fetchInfo: ${liquidityPrice.toFixed()}`);
-
+                */
                 if (this.config.trailingStopLoss) {
                     const trailingLossFraction = amountOut.mul(this.config.stopLoss).numerator.div(new BN(100));
                     const trailingLossAmount = new TokenAmount(this.config.quoteToken, trailingLossFraction, true);
